@@ -14,7 +14,7 @@ define some functions for show, say and wait, if needed
 define some other functions, that you will need for extrastuff in the dialog
 (defun change-state (talker …) …)
 
-create a table of present talking objects, that maps symbols to talking objects
+create a table of talking objects, that maps symbols to talking objects
 (defparameter *talkers*
   (alexandria:plist-hash-table
     '(h "Hans"
@@ -24,9 +24,9 @@ create a table of present talking objects, that maps symbols to talking objects
 
 create a dialog
 the body can contain symbols, strings and lists
-symbols will change the present talking object to the object referenced by symbol in the table and call (show present)
-strings will call (say present string)
-lists will be interpreted as functoins: (fn …) will become (fn present …)
+symbols will change the talking object to the object referenced by symbol in the table and call (show talker)
+strings will call (say talker string)
+lists will be interpreted as functoins: (fn …) will become (fn talker …)
 the arguments wont be evalutated, macros are not possible
 the wait-function will be called, if one of these functoins returns nil
 if the wait-function returns non-nil the dialog will be canceled and return it's state
@@ -44,7 +44,7 @@ to call the talk, you have to bind the functions and talking objects first:
 *show-function*: your show-function (my-show here)
 *say-functoin*: your say-function (my-say here)
 *wait-function*: your wait-function (my-wait here)
-*present-table*: your present talking objects (*talkers* here)
+*talker-table*: your talkers (*talkers* here)
 
 then call (call-talk <talk>)
 

@@ -1,58 +1,61 @@
 (defpackage #:talk
   (:use #:cl #:iter #:alexandria)
-  (:export #:simple-show
-           #:simple-say
-           #:simple-wait
-           #:*show-function*
-           #:*say-function*
-           #:*wait-function*
-           #:show
+  (:export #:show
            #:say
            #:wait
-           #:*present-table*
+           #:undefined
+           #:*talk-context*
+           #:make-talk-context
            #:talk
            #:call-talk
            #:talk-text
            ))
 (in-package #:talk)
 
-(defun simple-show (object)
+(defun show (object)
   (declare (ignore object))
   t)
 
-(defun simple-say (object text)
-  (format t "~a: ~a~%"
+(defun say (object text)
+  (format t "~@[~a: ~]~a~%"
           object text)
   (finish-output))
 
-(defun simple-wait ()
-  (string-equal (read-line) "exit"))
-
-(defvar *show-function* 'simple-show)
-
-(defvar *say-function* 'simple-say)
-
-(defvar *wait-function* 'simple-wait)
-
-(defun show (object)
-  (funcall *show-function* object))
-
-(defun say (object text)
-  (funcall *say-function* object text))
-
 (defun wait ()
-  (funcall *wait-function*))
+  (string-equal "exit" (read-line)))
 
-(defvar *present-table*)
-(defun present (symbol)
-  (let ((object (gethash symbol *present-table* #1='#:not)))
+(defun undefined (fun &key)
+  (error "Function ~S undefined in this context" fun))
+
+(defvar *talk-context*)
+
+(defstruct talk-context
+  functions
+  talkers)
+
+
+(setq *talk-context*
+  (make-talk-context
+   :functions '(show show
+                say say
+                undefined undefined
+                wait wait)))
+
+
+(defun talker (symbol)
+  (let ((object
+         (gethash symbol (talk-context-talkers *talk-context*)
+                  #1='#:not)))
     (if (eq object #1#)
         (error "Object does not exist")
         object)))
 
 (defun call-talk-object (object)
-  (apply (car object) (present (cadr object)) (cddr object)))
-
+  (if-let ((fun (gethash (car object) (talk-context-functions *talk-context*))))
+    (apply fun (talker (cadr object)) (cddr object))
+    (apply (gethash 'undefined (talk-context-functions *talk-context*))
+           (talker (cadr object)) (cddr object))))
+           
 (defmacro talk (&body body)
   `',(iter (for element in body)
            (with present)
@@ -62,23 +65,21 @@
                  (string `(say ,present ,element))
                  (list `(,(car element) ,present ,@(cdr element)))))))
 
-(defun call-talk (talk &optional (initial-state 0))
-  (or (iter (for state from initial-state below (length talk))
-            (for object in (last talk (- (length talk) initial-state)))
-            (unless (call-talk-object object)
-              (when (wait)
-                (return state))))
-      0))
+(defun call-talk (talk &optional new-state
+                       &aux (initial-state (or new-state 0)))
+  (iter (for state from initial-state below (length talk))
+        (for object in (last talk (- (length talk) initial-state)))
+        (unless (call-talk-object object)
+          (when (funcall (gethash 'wait (talk-context-functions *talk-context*)))
+            (return state)))))
 
 (defun talk-text (talk)
   (iter (for list in talk)
         (when (eq (car list) 'say)
-            (collect (caddr list)))))
+          (collect (caddr list)))))
 
 (defun (setf talk-text) (value talk)
   (iter (for list in talk)
         (when (eq (car list) 'say)
           (setf (caddr list) (car value)
                 value (cdr value)))))
-
-
