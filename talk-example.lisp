@@ -68,7 +68,7 @@
 ;; we have to create a table with our new functions
 ;; else the functions wouldn't be reusable for other interfaces
 
-(defparameter *functions*
+(defparameter *talk-functions*
   (alexandria:plist-hash-table
    '(talk:say dispatching-say                ;our new say-function
      feel feel
@@ -120,13 +120,11 @@
 ;;; they are not given to call-talk, because you may want to call different dialogs
 ;;; let's use a let for portability
 
-(defparameter *talk-context*
-  (talk:make-talk-context
-   :functions *functions*
-   :talkers *talkers*))
  
 
-(defun example-call (&aux (talk:*talk-context* *talk-context*))
+(defun example-call
+    (&aux (talk:*talk-functions* *talk-functions*)
+       (talk:*talkers* *talkers*))
   (setq *state* (talk:call-talk *dialog* *state*)))
 
 

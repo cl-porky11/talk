@@ -4,8 +4,8 @@
            #:say
            #:wait
            #:undefined
-           #:*talk-context*
-           #:make-talk-context
+           #:*talk-functions*
+           #:*talkers*
            #:talk
            #:call-talk
            #:talk-text
@@ -25,35 +25,29 @@
   (string-equal "exit" (read-line)))
 
 (defun undefined (fun &key)
-  (error "Function ~S undefined in this context" fun))
+  (error "~S not a talk-function" fun))
 
-(defvar *talk-context*)
+(defvar *talk-functions*
+  (plist-hash-table
+   '(show show
+     say say
+     undefined undefined
+     wait wait)))
 
-(defstruct talk-context
-  functions
-  talkers)
-
-
-(setq *talk-context*
-  (make-talk-context
-   :functions '(show show
-                say say
-                undefined undefined
-                wait wait)))
-
+(defvar *talkers*)
 
 (defun talker (symbol)
   (let ((object
-         (gethash symbol (talk-context-talkers *talk-context*)
+         (gethash symbol *talkers*
                   #1='#:not)))
     (if (eq object #1#)
         (error "Object does not exist")
         object)))
 
 (defun call-talk-object (object)
-  (if-let ((fun (gethash (car object) (talk-context-functions *talk-context*))))
+  (if-let ((fun (gethash (car object) *talk-functions*)))
     (apply fun (talker (cadr object)) (cddr object))
-    (apply (gethash 'undefined (talk-context-functions *talk-context*))
+    (apply (gethash 'undefined  *talk-functions*)
            (talker (cadr object)) (cddr object))))
            
 (defmacro talk (&body body)
@@ -70,7 +64,7 @@
   (iter (for state from initial-state below (length talk))
         (for object in (last talk (- (length talk) initial-state)))
         (unless (call-talk-object object)
-          (when (funcall (gethash 'wait (talk-context-functions *talk-context*)))
+          (when (funcall (gethash 'wait *talk-functions*))
             (return state)))))
 
 (defun talk-text (talk)
