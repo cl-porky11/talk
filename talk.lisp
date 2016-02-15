@@ -4,35 +4,25 @@
            #:say
            #:wait
            #:undefined
-           #:*talk-functions*
            #:*talkers*
            #:talk
+           #:make-talk
            #:call-talk
            #:talk-text
            ))
 (in-package #:talk)
 
-(defun show (object)
-  (declare (ignore object))
+(defmethod show (interface object)
   t)
 
-(defun say (object text)
-  (format t "~@[~a: ~]~a~%"
-          object text)
-  (finish-output))
+(defgeneric say (interface talker text &key)
+  (:method (interface talker text &key to)
+    (format t "~@[~a: ~]~a~%"
+            talker (format nil text to))
+    (finish-output)))
 
-(defun wait ()
+(defmethod wait (interface)
   (string-equal "exit" (read-line)))
-
-(defun undefined (fun &key)
-  (error "~S not a talk-function" fun))
-
-(defvar *talk-functions*
-  (plist-hash-table
-   '(show show
-     say say
-     undefined undefined
-     wait wait)))
 
 (defvar *talkers*)
 
@@ -43,28 +33,28 @@
     (if (eq object #1#)
         (error "Object does not exist")
         object)))
-
-(defun call-talk-object (object)
-  (if-let ((fun (gethash (car object) *talk-functions*)))
-    (apply fun (talker (cadr object)) (cddr object))
-    (apply (gethash 'undefined  *talk-functions*)
-           (talker (cadr object)) (cddr object))))
+ 
+(defun call-talk-object (interface object)
+  (apply (car object) interface (talker (cadr object)) (cddr object)))
            
-(defmacro talk (&body body)
-  `',(iter (for element in body)
-           (with present)
-           (collect
-               (etypecase element
-                 (symbol (setq present element) `(show ,present))
-                 (string `(say ,present ,element))
-                 (list `(,(car element) ,present ,@(cdr element)))))))
+(defun make-talk (body)
+  (iter (for element in body)
+        (with talker)
+        (collect
+            (etypecase element
+              (symbol (setq talker element) `(show ,talker))
+              (string `(say ,talker ,element))
+              (list `(,(car element) ,talker ,@(cdr element)))))))
 
-(defun call-talk (talk &optional new-state
-                       &aux (initial-state (or new-state 0)))
+(defmacro talk (&body body)
+  `',(make-talk body))
+
+(defun call-talk (talk &key state interface
+                       &aux (initial-state (or state 0)))
   (iter (for state from initial-state below (length talk))
         (for object in (last talk (- (length talk) initial-state)))
-        (unless (call-talk-object object)
-          (when (funcall (gethash 'wait *talk-functions*))
+        (unless (call-talk-object interface object)
+          (when (wait interface)
             (return state)))))
 
 (defun talk-text (talk)

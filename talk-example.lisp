@@ -20,9 +20,9 @@
 ;;; this function should return nil,
 ;;; so wait will be called after a person said something
 
-(defun person-say (person text)
-  (with-accessors
-        ((feeling person-feeling) (name person-name)) person
+(defmethod talk:say (interface (person person) text &key)
+  (with-accessors ((feeling person-feeling)
+                   (name person-name)) person
     (format t "~a~@[(~a)~]: ~a~%" name feeling text)))
 
 
@@ -30,55 +30,36 @@
 ;;; this function shouldn't return nil,
 ;;; else wait will be called after each change of the feeling
 ;;; the first argument is the talker
+;;; let's use methods, so we can define different methods for different interfaces
 
-(defun feel (person &optional feeling)
+(defmethod feel (interface (person person) &optional feeling)
   (setf (person-feeling person) feeling)
   t)
 
 
 ;;; there are only a few feelings
 ;;; it would be easier to write only the feeling in brackets yourself
+;;; these can be functions, because you will only modify feel for different interfaces
 
-(defun happy (person)
-  (feel person "happy"))
+(defun happy (interface person)
+  (feel interface person "happy"))
 
-(defun sad (person)
-  (feel person "sad"))
+(defun sad (interface person)
+  (feel interface person "sad"))
+
+;;; you also could define them as methods, and let the interface save the language, so 
 
 ;;; we may also need a narrator, who should displayed different than persons
-;;; we could write a new class, but using nil as a value for the narrator wil be enough,
+;;; we could write a new class, but using nil as a value for the narrator will be enough,
 ;;; when there is only one narrator with no slots needed
 ;;; the talker is nil by default, so the text we write before announcing a talker
 ;;; will be said by the narrator
 ;;; so we will define a method for our say-function
 ;;; it can easily be extended for different kinds of talkers
 
-(defgeneric dispatching-say (person talk)
-  (:method ((person null) text)
-    ;;the narrator
-    (write-line text)
-    nil)                                ;return nil, so wait will be called
-                                        ;also after the narrator talking
-  (:method ((talker person) text)
-    (person-say talker text)))
-
-
-
-
-;; we have to create a table with our new functions
-;; else the functions wouldn't be reusable for other interfaces
-
-(defparameter *talk-functions*
-  (alexandria:plist-hash-table
-   '(talk:say dispatching-say                ;our new say-function
-     feel feel
-     happy happy
-     sad sad
-     talk:show talk:show                          ;the defualt functions
-     talk:wait talk:wait                          ;for wait, show
-     talk:undefined talk:undefined)))             ;and undefined
-
-;;; now we can define our persons and write the dialog
+(defmethod talk:say (interface (narrator null) text &key)
+  (write-line text)
+  nil)                                ;return nil, so wait will be called
 
 
 (defparameter *talkers*
@@ -97,7 +78,7 @@
     me(sad)"Can I help you?"            ;me now also sad
     friend"No"                          ;friend yet sad
     me(feel)"Here you have a present"   ;set feeling to none
-    nil"I give him a present"             ;narrator now talking
+    nil"I give him a present"           ;narrator now talking
     friend(happy)                       ;friend gets happy
                                         ;you wont recognize,
                                         ;but it may be important,
@@ -122,10 +103,8 @@
 
  
 
-(defun example-call
-    (&aux (talk:*talk-functions* *talk-functions*)
-       (talk:*talkers* *talkers*))
-  (setq *state* (talk:call-talk *dialog* *state*)))
+(defun example-call (&aux (talk:*talkers* *talkers*))
+  (setq *state* (talk:call-talk *dialog* :state *state*)))
 
 
 ;;; if you want to translate the text of the dialog, without worrying about the internals
